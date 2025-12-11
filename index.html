@@ -1,175 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Rendering Inspector – SSR / CSR Detector</title>
-
-  <!-- Tailwind CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <style>
-    .fade-in { animation: fadein 0.4s ease; }
-    @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rendering Inspector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
+<body class="bg-gray-100 min-h-screen">
 
-<body class="bg-gray-100 min-h-screen flex flex-col">
+    <div class="max-w-6xl mx-auto py-10">
 
-  <!-- Navbar -->
-  <header class="bg-white shadow">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-gray-800">Rendering Inspector</h1>
-      <nav class="hidden md:flex gap-6 text-gray-600 font-medium">
-        <a href="#" class="hover:text-gray-900">Home</a>
-        <a href="#" class="hover:text-gray-900">Docs</a>
-        <a href="#" class="hover:text-gray-900">About</a>
-      </nav>
-    </div>
-  </header>
+        <h1 class="text-3xl font-bold text-center mb-6">Rendering Inspector</h1>
 
-  <!-- Main Content -->
-  <main class="flex-grow">
-    <div class="max-w-6xl mx-auto px-6 py-10">
-
-      <!-- Intro -->
-      <div class="mb-10">
-        <h2 class="text-4xl font-bold text-gray-900 mb-4">SSR / CSR Detection Tool</h2>
-        <p class="text-gray-600 text-lg max-w-3xl">
-          Enter a website URL and this tool will compare the raw HTML against the rendered version to guess whether it's
-          <span class="font-semibold">SSR/SSG</span> or <span class="font-semibold">CSR</span>.
-        </p>
-      </div>
-
-      <!-- Input Card -->
-      <div class="bg-white shadow rounded-xl p-6 mb-8">
-        <div class="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-          <input 
-            id="urlInput"
-            class="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            placeholder="https://example.com"
-            type="text"
-          />
-          <button id="checkBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Analyse</button>
-        </div>
-      </div>
-
-      <!-- Results + Preview Layout -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-        <!-- Result Card -->
-        <div id="result" class="bg-white shadow rounded-xl p-6 fade-in hidden"></div>
-
-        <!-- Preview Card -->
-        <div class="bg-white shadow rounded-xl p-6">
-          <h3 class="text-xl font-semibold mb-3">Rendered Preview</h3>
-          <iframe
-            id="preview"
-            class="w-full h-[520px] border rounded-lg"
-            src="https://placehold.co/1000x520?text=Website+Preview"
-            loading="lazy"
-          ></iframe>
+        <!-- INPUT AREA -->
+        <div class="flex gap-4 mb-6">
+            <input id="urlInput"
+                   type="text"
+                   placeholder="Enter a URL (e.g. https://flirtist.ai)"
+                   class="flex-1 px-4 py-2 border rounded w-full">
+            <button id="checkBtn"
+                    class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Analyse
+            </button>
         </div>
 
-      </div>
+        <!-- RESULT BOX -->
+        <div id="resultBox" class="mb-6 text-center text-lg font-semibold text-gray-700">
+            Waiting for input…
+        </div>
 
+        <!-- TWO COLUMN LAYOUT -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- LEFT COLUMN: RAW HTML -->
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="text-xl font-bold mb-2">Raw HTML Returned by Server</h2>
+                <pre id="rawHTML"
+                     class="whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded max-h-[70vh] overflow-auto">
+                </pre>
+            </div>
+
+            <!-- RIGHT COLUMN: LIVE PREVIEW -->
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="text-xl font-bold mb-2">Browser Rendering (Iframe Preview)</h2>
+                <iframe id="renderFrame"
+                        class="w-full h-[70vh] border rounded bg-white"
+                        src="https://placehold.co/600x400?text=Preview+Here">
+                </iframe>
+            </div>
+
+        </div>
     </div>
-  </main>
 
-  <!-- Footer -->
-  <footer class="bg-white border-t mt-10">
-    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-gray-600">
-      Rendering Inspector © 2025. Crafted for analysing modern web rendering behaviour.
-    </div>
-  </footer>
+    <!-- ============================= -->
+    <!--   SSR / CSR DETECTOR LOGIC    -->
+    <!-- ============================= -->
 
-  <!-- Script -->
-<script>
-async function runCheck() {
-    const urlInput = document.getElementById("urlInput").value.trim();
-    const resultBox = document.getElementById("resultBox");
-    const rawColumn = document.getElementById("rawHTML");
-    const iframe = document.getElementById("renderFrame");
+    <script>
+    // --- MAIN ANALYSER FUNCTION ---
+    async function runCheck() {
+        console.log("runCheck() started");
 
-    if (!urlInput) {
-        resultBox.innerHTML = `<p class="text-red-600 font-bold">Please enter a URL.</p>`;
-        return;
-    }
+        const urlInput = document.getElementById("urlInput").value.trim();
+        const resultBox = document.getElementById("resultBox");
+        const rawColumn = document.getElementById("rawHTML");
+        const iframe = document.getElementById("renderFrame");
 
-    // Reset UI
-    rawColumn.textContent = "Fetching raw HTML…";
-    resultBox.innerHTML = `<p class="text-blue-600 font-bold">Analysing…</p>`;
-    iframe.src = urlInput;
-
-    let rawHtml = "";
-
-    // === 1. FETCH RAW HTML FROM THE SERVERLESS FUNCTION ===
-    try {
-        const apiUrl = `/api/fetch-html.js?url=${encodeURIComponent(urlInput)}`;
-        const response = await fetch(apiUrl);
-
-        if (!response.ok) {
-            throw new Error("API returned " + response.status);
+        if (!urlInput) {
+            resultBox.innerHTML = `<p class="text-red-600 font-bold">Please enter a URL.</p>`;
+            return;
         }
 
-        const data = await response.json();
-        rawHtml = data.html || "";
+        rawColumn.textContent = "Fetching raw HTML…";
+        resultBox.innerHTML = `<p class="text-blue-600 font-bold">Analysing…</p>`;
 
-        // Show the first part of the raw HTML in the left column
-        rawColumn.textContent = rawHtml.substring(0, 20000) || "No HTML returned.";
+        // Show live preview visually
+        iframe.src = urlInput;
 
-        console.log("RAW HTML LENGTH:", rawHtml.length);
+        let rawHtml = "";
 
-        if (!rawHtml || rawHtml.length < 50) {
+        // --- FETCH RAW HTML FROM VERCEL SERVERLESS FUNCTION ---
+        try {
+            const apiUrl = `/api/fetch-html.js?url=${encodeURIComponent(urlInput)}`;
+            console.log("Fetching:", apiUrl);
+
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error("API returned " + response.status);
+
+            const data = await response.json();
+            rawHtml = data.html || "";
+
+            rawColumn.textContent = rawHtml.substring(0, 20000) || "No HTML returned.";
+
+            console.log("RAW HTML LENGTH:", rawHtml.length);
+
+            if (!rawHtml || rawHtml.length < 50) {
+                resultBox.innerHTML = `
+                    <p class="text-red-600 font-bold text-xl">Raw HTML is empty or blocked.</p>
+                    <p class="text-gray-700">The website may block server-side requests.</p>
+                `;
+                return;
+            }
+
+        } catch (err) {
+            console.error(err);
+            rawColumn.textContent = "Error fetching raw HTML.";
             resultBox.innerHTML = `
-                <p class="text-red-600 font-bold text-xl">Raw HTML is empty or blocked.</p>
-                <p class="text-gray-700">The website may block server-side requests.</p>
+                <p class="text-red-600 font-bold">Error fetching raw HTML</p>
+                <p class="text-gray-700">${err.message}</p>
             `;
             return;
         }
-    } catch (err) {
-        rawColumn.textContent = "Error fetching raw HTML.";
-        resultBox.innerHTML = `
-            <p class="text-red-600 font-bold">Error fetching raw HTML</p>
-            <p class="text-gray-700">${err.message}</p>
-        `;
-        return;
+
+        // --- DETECT SSR OR CSR ---
+        const isCSR =
+            rawHtml.includes("BAILOUT_TO_CLIENT_SIDE_RENDERING") ||
+            rawHtml.includes("__next_f.push") ||
+            (rawHtml.includes('id="__next"') && !rawHtml.match(/<main|<div|<section/i));
+
+        if (isCSR) {
+            resultBox.innerHTML = `
+                <p class="text-yellow-700 font-bold text-xl">Client-Side Rendering (CSR)</p>
+                <p class="mt-2 text-gray-700">
+                    This HTML was mostly empty and depends on JavaScript to render content.
+                </p>
+            `;
+        } else {
+            resultBox.innerHTML = `
+                <p class="text-green-700 font-bold text-xl">Server-Side Rendering (SSR)</p>
+                <p class="mt-2 text-gray-700">
+                    Meaningful content was returned directly in the HTML.
+                </p>
+            `;
+        }
     }
+    </script>
 
-    // === 2. DETECT SSR VS CSR FROM RAW HTML ===
-    const hasNextCSRMarkers =
-        rawHtml.includes("BAILOUT_TO_CLIENT_SIDE_RENDERING") ||
-        rawHtml.includes("__next_f.push") ||
-        rawHtml.includes("id=\"__next\"") && !rawHtml.match(/<main|<div|<section/i);
+    <!-- ENSURE BUTTON ALWAYS WORKS -->
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const btn = document.getElementById("checkBtn");
 
-    const appearsEmptyDocument =
-        rawHtml.replace(/\s+/g, "").length < 500; // super minimal markup
+        if (!btn) {
+            console.error("Analyse button not found in DOM!");
+            return;
+        }
 
-    let isCSR = false;
-
-    if (hasNextCSRMarkers || appearsEmptyDocument) {
-        isCSR = true;
-    }
-
-    // === 3. DISPLAY RESULT ===
-    if (isCSR) {
-        resultBox.innerHTML = `
-            <p class="text-yellow-700 font-bold text-xl">Client-Side Rendering (CSR)</p>
-            <p class="text-gray-700 mt-2">
-                The server delivered minimal or placeholder HTML.
-                The actual content loads only in the browser via JavaScript.
-            </p>
-        `;
-    } else {
-        resultBox.innerHTML = `
-            <p class="text-green-700 font-bold text-xl">Server-Side Rendering (SSR)</p>
-            <p class="text-gray-700 mt-2">
-                Meaningful content was delivered directly in the HTML response.
-            </p>
-        `;
-    }
-}
-</script>
-
+        console.log("Button event attached.");
+        btn.addEventListener("click", runCheck);
+    });
+    </script>
 
 </body>
 </html>
