@@ -1,3 +1,7 @@
+export const config = {
+  runtime: "nodejs18.x"
+};
+
 export default async function handler(req, res) {
   const url = req.query.url;
 
@@ -9,18 +13,14 @@ export default async function handler(req, res) {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; SSR-Detector/1.0; +https://example.com)"
+        "User-Agent": "Mozilla/5.0 SSR-Detector"
       }
     });
 
-    const text = await response.text();
+    const html = await response.text();
+    return res.status(200).json({ html });
 
-    res.status(200).json({ html: text });
   } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch HTML",
-      details: error.toString()
-    });
+    return res.status(500).json({ error: error.toString() });
   }
 }
