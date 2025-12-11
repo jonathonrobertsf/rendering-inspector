@@ -1,5 +1,5 @@
 export const config = {
-  runtime: "nodejs18.x"
+  runtime: "nodejs"
 };
 
 export default async function handler(req, res) {
@@ -13,14 +13,14 @@ export default async function handler(req, res) {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "User-Agent": "Mozilla/5.0 SSR-Detector"
+        "User-Agent": "Mozilla/5.0 SSR-Inspector"
       }
     });
 
-    const html = await response.text();
-    return res.status(200).json({ html });
+    const text = await response.text();
 
+    res.status(200).json({ html: text });
   } catch (error) {
-    return res.status(500).json({ error: error.toString() });
+    res.status(500).json({ error: error.toString() });
   }
 }
