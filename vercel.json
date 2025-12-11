@@ -1,11 +1,7 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "api/fetch-html.js", "use": "@vercel/node" }
-  ],
+  "version": 3,
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/api/fetch-html.js", "dest": "api/fetch-html.js" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
