@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rendering Inspector – SSR / CSR Detector</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    .fade-in { animation: fadein 0.4s ease; }
+    @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <header class="bg-white shadow">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-gray-800">Rendering Inspector</h1>
+      <nav class="hidden md:flex gap-6 text-gray-600 font-medium">
+        <a href="#" class="hover:text-gray-900">Home</a>
+        <a href="#" class="hover:text-gray-900">Docs</a>
+        <a href="#" class="hover:text-gray-900">About</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow">
+    <div class="max-w-6xl mx-auto px-6 py-10">
+
+      <!-- Intro -->
+      <div class="mb-10">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">SSR / CSR Detection Tool</h2>
+        <p class="text-gray-600 text-lg max-w-3xl">
+          Enter a website URL and this tool will compare the raw HTML against the rendered version to guess whether it's
+          <span class="font-semibold">SSR/SSG</span> or <span class="font-semibold">CSR</span>.
+        </p>
+      </div>
+
+      <!-- Input Card -->
+      <div class="bg-white shadow rounded-xl p-6 mb-8">
+        <div class="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+          <input 
+            id="urlInput"
+            class="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            placeholder="https://example.com"
+            type="text"
+          />
+          <button
+            onclick="runCheck()"
+            class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+          >
+            Analyse
+          </button>
+        </div>
+      </div>
+
+      <!-- Results + Preview Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        <!-- Result Card -->
+        <div id="result" class="bg-white shadow rounded-xl p-6 fade-in hidden"></div>
+
+        <!-- Preview Card -->
+        <div class="bg-white shadow rounded-xl p-6">
+          <h3 class="text-xl font-semibold mb-3">Rendered Preview</h3>
+          <iframe
+            id="preview"
+            class="w-full h-[520px] border rounded-lg"
+            src="https://placehold.co/1000x520?text=Website+Preview"
+            loading="lazy"
+          ></iframe>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t mt-10">
+    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-gray-600">
+      Rendering Inspector © 2025. Crafted for analysing modern web rendering behaviour.
+    </div>
+  </footer>
+
+  <!-- Script -->
+  <script>
+    async function fetchRawHTML(url) {
+      const encoded = encodeURIComponent(url);
+      const res = await fetch(`/api/fetch-html?url=${encoded}`);
+      const json = await res.json();
+      return json.html || null;
+    }
+
+    function determineOutcome(rawLength, renderedLength) {
+      if (!rawLength) {
+        return `
+          <div class="text-red-700 font-semibold text-xl">Could not fetch HTML</div>
+          <p class="text-gray-700 mt-2">The remote site may be blocking requests or returning an error.</p>
+        `;
+      }
+
+      const ratio = rawLength / renderedLength;
+
+      if (ratio > 0.7) {
+        return `
+          <div class="text-green-700 font-semibold text-2xl">Likely SSR / SSG</div>
+          <p class="text-gray-700 mt-2">The raw HTML already contains meaningful content before JavaScript runs.</p>
+        `;
+      }
+
+      return `
+        <div class="text-red-700 font-semibold text-2xl">Likely CSR</div>
+        <p class="text-gray-700 mt-2">The page content appears to rely heavily on JavaScript for rendering.</p>
+      `;
+    }
+
+    async function runCheck() {
+      const url = document.getElementById("urlInput").value.trim();
+      const resultBox = document.getElementById("result");
+      const iframe = document.getElementById("preview");
+
+      if (!url) return;
+
+      resultBox.classList.remove("hidden");
+      resultBox.innerHTML = `<div class="text-gray-700">Analysing…</div>`;
+
+      // Load the page into the iframe (JS-enabled environment)
+      iframe.src = url;
+
+      // Fetch raw HTML from the serverless function
+      const raw = await fetchRawHTML(url);
+
+      // Give the iframe a bit of time to load
+      setTimeout(() => {
+        let renderedHTML = "";
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+
+        try {
+          renderedHTML = doc.documentElement.innerHTML;
+        } catch (e) {
+          renderedHTML = "";
+        }
+
+        const rawLength = raw ? raw.length : 0;
+        const renderedLength = renderedHTML.length || 1;
+
+        resultBox.innerHTML = `
+          <div class="fade-in">
+            ${determineOutcome(rawLength, renderedLength)}
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg text-sm text-gray-700">
+              <div><strong>Raw HTML size:</strong> ${rawLength.toLocaleString()} characters</div>
+              <div><strong>Rendered DOM size:</strong> ${renderedLength.toLocaleString()} characters</div>
+              <div class="text-gray-500 mt-2">Differences in size and content indicate whether the page is rendered on the server or mainly in the browser.</div>
+            </div>
+          </div>
+        `;
+      }, 1200);
+    }
+  </script>
+
+</body>
+</html>
