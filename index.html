@@ -17,16 +17,13 @@
             background-color: #f5f7fa;
             font-family: "Poppins", sans-serif;
         }
-        .result-box {
-            min-height: 60px;
-        }
         pre {
             background: #f3f3f3;
             border-radius: 6px;
             padding: 15px;
-            max-height: 70vh;
-            overflow-y: auto;
             font-size: 0.85rem;
+            white-space: pre-wrap; /* Wrap lines */
+            word-break: break-word; /* Break long strings */
         }
         iframe {
             border: 1px solid #ccc;
@@ -62,7 +59,7 @@
     </div>
 
     <!-- Result Box -->
-    <div id="resultBox" class="result-box text-center fw-semibold text-secondary mb-4">
+    <div id="resultBox" class="text-center fw-semibold text-secondary mb-4">
         Waiting for input…
     </div>
 
@@ -140,7 +137,7 @@ async function runCheck() {
         const data = await response.json();
         rawHtml = data.html || "";
 
-        rawColumn.textContent = rawHtml.substring(0, 20000) || "No HTML returned.";
+        rawColumn.textContent = rawHtml || "No HTML returned.";
 
         console.log("RAW HTML LENGTH:", rawHtml.length);
 
@@ -182,17 +179,11 @@ async function runCheck() {
 }
 </script>
 
-<!-- ENSURE BUTTON ALWAYS WORKS -->
+<!-- Ensure button works -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById("checkBtn");
-
-    if (!btn) {
-        console.error("Analyse button not found!");
-        return;
-    }
-
-    console.log("Button event attached.");
+    if (!btn) return console.error("Analyse button not found!");
     btn.addEventListener("click", runCheck);
 });
 </script>
