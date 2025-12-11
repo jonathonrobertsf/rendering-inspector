@@ -91,7 +91,7 @@
   <script>
     async function fetchRawHTML(url) {
       const encoded = encodeURIComponent(url);
-      const res = await fetch(`/api/fetch-html?url=${encoded}`);
+      const res = await fetch(`/api/fetch-html.js?url=${encoded}`);
       const json = await res.json();
       return json.html || null;
     }
