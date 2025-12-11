@@ -88,80 +88,118 @@
   </footer>
 
   <!-- Script -->
-  <script>
-    async function fetchRawHTML(url) {
-      const encoded = encodeURIComponent(url);
-      const res = await fetch(`/api/fetch-html.js?url=${encoded}`);
-      const json = await res.json();
-      return json.html || null;
+<script>
+async function runCheck() {
+    const urlInput = document.getElementById("urlInput").value.trim();
+    const resultBox = document.getElementById("resultBox");
+    const rawColumn = document.getElementById("rawHTML");
+    const renderedColumn = document.getElementById("renderedHTML");
+    const iframe = document.getElementById("renderFrame");
+
+    if (!urlInput) {
+        resultBox.innerHTML = `<p class="text-red-600 font-bold">Please enter a URL.</p>`;
+        return;
     }
 
-    function determineOutcome(rawLength, renderedLength) {
-      if (!rawLength) {
-        return `
-          <div class="text-red-700 font-semibold text-xl">Could not fetch HTML</div>
-          <p class="text-gray-700 mt-2">The remote site may be blocking requests or returning an error.</p>
-        `;
-      }
+    // Reset UI
+    rawColumn.textContent = "Fetching raw HTML...";
+    renderedColumn.textContent = "Loading iframe...";
+    resultBox.innerHTML = `<p class="text-blue-600 font-bold">Analysing…</p>`;
 
-      const ratio = rawLength / renderedLength;
+    // --- FETCH RAW HTML FROM API ---
+    let rawHtml = "";
+    try {
+        const apiUrl = `/api/fetch-html.js?url=${encodeURIComponent(urlInput)}`;
+        const response = await fetch(apiUrl);
 
-      if (ratio > 0.7) {
-        return `
-          <div class="text-green-700 font-semibold text-2xl">Likely SSR / SSG</div>
-          <p class="text-gray-700 mt-2">The raw HTML already contains meaningful content before JavaScript runs.</p>
-        `;
-      }
+        if (!response.ok) throw new Error("API returned " + response.status);
 
-      return `
-        <div class="text-red-700 font-semibold text-2xl">Likely CSR</div>
-        <p class="text-gray-700 mt-2">The page content appears to rely heavily on JavaScript for rendering.</p>
-      `;
-    }
+        const data = await response.json();
+        rawHtml = data.html || "";
 
-    async function runCheck() {
-      const url = document.getElementById("urlInput").value.trim();
-      const resultBox = document.getElementById("result");
-      const iframe = document.getElementById("preview");
+        console.log("RAW LENGTH:", rawHtml.length);
 
-      if (!url) return;
-
-      resultBox.classList.remove("hidden");
-      resultBox.innerHTML = `<div class="text-gray-700">Analysing…</div>`;
-
-      // Load the page into the iframe (JS-enabled environment)
-      iframe.src = url;
-
-      // Fetch raw HTML from the serverless function
-      const raw = await fetchRawHTML(url);
-
-      // Give the iframe a bit of time to load
-      setTimeout(() => {
-        let renderedHTML = "";
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-
-        try {
-          renderedHTML = doc.documentElement.innerHTML;
-        } catch (e) {
-          renderedHTML = "";
+        if (!rawHtml || rawHtml.length < 50) {
+            rawColumn.textContent = "Error: Raw HTML is empty or blocked by the website.";
+            resultBox.innerHTML = `
+                <p class="text-red-600 font-bold">The website blocked server-side HTML fetching.</p>
+                <p class="text-gray-700">Some sites (Next.js + Cloudflare) won't allow raw HTML extraction.</p>
+            `;
+            return;
         }
 
-        const rawLength = raw ? raw.length : 0;
-        const renderedLength = renderedHTML.length || 1;
+        rawColumn.textContent = rawHtml;
 
+    } catch (err) {
+        console.error(err);
+        rawColumn.textContent = "Error fetching raw HTML.";
         resultBox.innerHTML = `
-          <div class="fade-in">
-            ${determineOutcome(rawLength, renderedLength)}
-            <div class="mt-4 p-4 bg-gray-50 rounded-lg text-sm text-gray-700">
-              <div><strong>Raw HTML size:</strong> ${rawLength.toLocaleString()} characters</div>
-              <div><strong>Rendered DOM size:</strong> ${renderedLength.toLocaleString()} characters</div>
-              <div class="text-gray-500 mt-2">Differences in size and content indicate whether the page is rendered on the server or mainly in the browser.</div>
-            </div>
-          </div>
+            <p class="text-red-600 font-bold">Error fetching raw HTML</p>
+            <p class="text-gray-700">${err.message}</p>
         `;
-      }, 1200);
+        return;
     }
-  </script>
+
+    // --- LOAD IFRAME ---
+    iframe.src = urlInput;
+
+    // Give the iframe time to hydrate
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // POLL THE IFRAME DOM SAFELY
+    function tryGetRenderedHTML() {
+        try {
+            return iframe.contentDocument.documentElement.innerHTML;
+        } catch (e) {
+            return "";
+        }
+    }
+
+    let renderedHtml = "";
+    let attempts = 0;
+
+    while (attempts < 20) {
+        renderedHtml = tryGetRenderedHTML();
+
+        if (renderedHtml && renderedHtml.length > 50) break;
+
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (!renderedHtml || renderedHtml.length < 50) {
+        renderedColumn.textContent = "Could not extract fully rendered HTML (iframes may be blocked).";
+        resultBox.innerHTML = `
+            <p class="text-red-600 font-bold">Iframe HTML not accessible.</p>
+            <p class="text-gray-700">Some websites block iframe access using COOP/COEP or Cloudflare.</p>
+        `;
+        return;
+    }
+
+    renderedColumn.textContent = renderedHtml;
+
+    // --- DETERMINE SSR / CSR ---
+
+    // Heuristic based on real-world Next.js behaviour
+    const isCSR =
+        rawHtml.includes("BAILOUT_TO_CLIENT_SIDE_RENDERING") ||
+        rawHtml.includes("__next_f.push") ||
+        !rawHtml.replace(/\s+/g, "").match(/<main|<div|<section/); // no real content
+
+    if (isCSR) {
+        resultBox.innerHTML = `
+            <p class="text-yellow-700 font-bold text-xl">Client-Side Rendering (CSR)</p>
+            <p class="text-gray-700 mt-2">The server delivered almost no usable HTML. The page is rendered in the browser via JavaScript.</p>
+        `;
+    } else {
+        resultBox.innerHTML = `
+            <p class="text-green-700 font-bold text-xl">Server-Side Rendering (SSR)</p>
+            <p class="text-gray-700 mt-2">Meaningful HTML was delivered directly from the server.</p>
+        `;
+    }
+}
+</script>
+
 
 </body>
 </html>
